@@ -12,12 +12,12 @@ def generate_packet_trace(node_id, simulation_time, interval, num_nodes):
             current_time += interval
 
 def main():
-    num_nodes = 50  # 节点数量
-    simulation_time = 60.0  # 仿真时间(秒)
-    interval = 0.03  # 30毫秒的间隔
+    num_nodes = 10  # 节点数量
+    simulation_time = 20.0  # 仿真时间(秒)
+    interval = 1  # 30毫秒的间隔
 
     # 创建traces目录(如果不存在)
-    os_directory = "traces"
+    os_directory = "interTest"
     if not os.path.exists(os_directory):
         os.makedirs(os_directory)
 

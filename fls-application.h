@@ -1,29 +1,31 @@
 #ifndef FLS_APPLICATION_H
 #define FLS_APPLICATION_H
 
-#include "ns3/application.h"
-#include "ns3/socket.h"
-#include "ns3/network-module.h"
-#include "ns3/internet-module.h"
-#include "ns3/vector.h"
 #include "packet-trace.h"
+
+#include "ns3/application.h"
+#include "ns3/internet-module.h"
+#include "ns3/network-module.h"
+#include "ns3/socket.h"
+#include "ns3/vector.h"
+
 #include <vector>
 
-
-namespace ns3{
+namespace ns3
+{
 
 class FLSApplication : public Application
 {
-public:
+  public:
     static TypeId GetTypeId(void);
     FLSApplication();
     virtual ~FLSApplication();
 
     uint32_t GetPacketsSent(void) const;
     uint32_t GetPacketsReceived(void) const;
-    void SetupTraceFile(const std::string & filename);
+    void SetupTraceFile(const std::string& filename);
 
-private:
+  private:
     virtual void StartApplication(void);
     virtual void StopApplication(void);
 
@@ -42,6 +44,6 @@ private:
     EventId m_sendEvent;
 };
 
-}
+} // namespace ns3
 
 #endif

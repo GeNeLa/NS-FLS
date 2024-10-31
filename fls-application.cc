@@ -80,7 +80,7 @@ void
 FLSApplication::SendPacket(void)
 {
     Ptr<MobilityModel> mobility = GetNode()->GetObject<MobilityModel>();
-    Vector myPos = mobility->GetPosition();
+    // Vector myPos = mobility->GetPosition();
 
     if (!m_packetTraces.empty())
     {
@@ -88,20 +88,74 @@ FLSApplication::SendPacket(void)
         Ptr<Packet> packet = Create<Packet>(trace.size);
 
         Ipv4Address destAddr(trace.destination.c_str());
-        InetSocketAddress remote = InetSocketAddress(destAddr, 9);
-        int ret = m_socket->SendTo(packet, 0, remote);
-        NS_LOG_INFO("Socket state after send: " << m_socket->GetErrno());
-        if (ret == -1)
+        bool isBroadCast = (trace.destination == "255.255.255.255");
+
+        if (!m_socket)
         {
-            NS_LOG_ERROR("Error sending packet: " << m_socket->GetErrno());
+            NS_LOG_ERROR("Socket is null");
+            return;
         }
 
-        NS_LOG_INFO("APP LAYER: " << Simulator::Now().GetSeconds() << "s\t"
-                                  << "Node " << GetNode()->GetId() << "\tSent\t" << trace.size
-                                  << " bytes\t"
-                                  << "To: " << trace.destination
-                                  << "\tPacketID: " << packet->GetUid() << "\tSocket:" << m_socket);
-        m_packetsSent++;
+        if (isBroadCast)
+        {
+            m_socket->SetAllowBroadcast(true);
+            InetSocketAddress broadcast = InetSocketAddress(Ipv4Address::GetBroadcast(), 9);
+            int ret = m_socket->SendTo(packet, 0, broadcast);
+            if (ret == -1)
+            {
+                NS_LOG_ERROR("Error broadcasting packet: " << m_socket->GetErrno());
+            }
+            else
+            {
+                NS_LOG_INFO("APP LAYER: " << Simulator::Now().GetSeconds() << "s\t"
+                                          << "Node " << GetNode()->GetId() << "\tBroadcast\t"
+                                          << trace.size << " bytes"
+                                          << "\tPacketID: " << packet->GetUid());
+                m_packetsSent++;
+            }
+        }
+        else
+        {
+            InetSocketAddress remote = InetSocketAddress(destAddr, 9);
+            int ret = m_socket->SendTo(packet, 0, remote);
+            if (ret == -1)
+            {
+                NS_LOG_ERROR("Error broadcasting packet: " << m_socket->GetErrno());
+            }
+            else
+            {
+                NS_LOG_INFO("APP LAYER: " << Simulator::Now().GetSeconds() << "s\t"
+                                          << "Node " << GetNode()->GetId() << "\tUniCast\t"
+                                          << trace.size << " bytes"
+                                          << "\tPacketID: " << packet->GetUid());
+                m_packetsSent++;
+            }
+        }
+
+        NS_LOG_INFO("Socket state after send: " << m_socket->GetErrno());
+
+        switch (m_socket->GetErrno())
+        {
+        case Socket::ERROR_NOTERROR:
+            NS_LOG_ERROR("No error");
+            break;
+        case Socket::ERROR_ISCONN:
+            NS_LOG_ERROR("Socket is connected");
+            break;
+        case Socket::ERROR_NOTCONN:
+            NS_LOG_ERROR("Socket is not connected");
+            break;
+        case Socket::ERROR_MSGSIZE:
+            NS_LOG_ERROR("Message too long");
+            break;
+        case Socket::ERROR_INVAL:
+            NS_LOG_ERROR("Invalid argument");
+            break;
+        default:
+            NS_LOG_ERROR("Unknown error");
+            break;
+        }
+
         m_currentTraceIndex++;
         ScheduleNextPacket();
     }
@@ -109,6 +163,7 @@ FLSApplication::SendPacket(void)
     else // if we don't have packet trace file, send packets as usual
     {
         NS_LOG_INFO("All packets from trace file have been sent or trace file is empty.");
+
         //     NodeContainer allNodes = NodeContainer::GetGlobal ();
 
         //   for (NodeContainer::Iterator i = allNodes.Begin (); i != allNodes.End (); ++i)
@@ -140,6 +195,7 @@ FLSApplication::ReceivePacket(Ptr<Socket> socket)
     while ((packet = socket->RecvFrom(from)))
     {
         m_packetsReceived++;
+
         NS_LOG_INFO("Node " << GetNode()->GetId() << " received packet from "
                             << InetSocketAddress::ConvertFrom(from).GetIpv4() << " at time "
                             << Simulator::Now().GetSeconds() << "s");

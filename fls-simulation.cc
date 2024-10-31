@@ -1,11 +1,16 @@
 #include "fls-application.h"
 #include "packet-trace.h"
+#include "statistics-manager.h"
 #include "trace-based-mobility-model.h"
 
+#include "ns3/aodv-module.h"
 #include "ns3/applications-module.h"
+#include "ns3/arp-cache.h"
 #include "ns3/core-module.h"
+#include "ns3/energy-module.h"
 #include "ns3/flow-monitor-module.h"
 #include "ns3/internet-module.h"
+#include "ns3/ipv4-l3-protocol.h"
 #include "ns3/ipv4-list-routing.h"
 #include "ns3/ipv4-static-routing.h"
 #include "ns3/mac48-address.h"
@@ -16,13 +21,9 @@
 #include "ns3/packet.h"
 #include "ns3/wifi-module.h"
 
+#include <json/json.h>
 #include <map>
 #include <vector>
-// #include <unistd.h>
-// #include <limits.h>
-
-#include "ns3/arp-cache.h"
-#include "ns3/ipv4-l3-protocol.h"
 
 struct PacketInfo
 {
@@ -41,111 +42,54 @@ using namespace ns3;
 
 NS_LOG_COMPONENT_DEFINE("FLSSimulation");
 
-void
-PrintStatistics()
-{
-    for (const auto& nodePair : nodeSentPackets)
-    {
-        uint32_t nodeId = nodePair.first;
-        const auto& packets = nodePair.second;
+// void
+// PrintStatistics()
+// {
+//     for (const auto& nodePair : nodeSentPackets)
+//     {
+//         uint32_t nodeId = nodePair.first;
+//         const auto& packets = nodePair.second;
 
-        uint32_t totalSent = packets.size();
-        uint32_t totalReceived = 0;
-        double totalDelay = 0.0;
-        uint32_t totalBytes = 0;
+//         uint32_t totalSent = packets.size();
+//         uint32_t totalReceived = 0;
+//         double totalDelay = 0.0;
+//         uint32_t totalBytes = 0;
 
-        NS_LOG_INFO("Node " << nodeId << " sent " << totalSent << " packets");
+//         // NS_LOG_INFO("Node " << nodeId << " sent " << totalSent << " packets");
 
-        for (const auto& packet : packets)
-        {
-            if (packet.received)
-            {
-                totalReceived++;
-                totalDelay += (packet.receiveTime - packet.sendTime);
-                NS_LOG_INFO("  Packet " << packet.packetId << " was received by Node "
-                                        << packet.destinationNode);
-            }
-            else
-            {
-                NS_LOG_INFO("  Packet " << packet.packetId << " was not received by Node "
-                                        << packet.destinationNode);
-            }
-            totalBytes += packet.size;
-        }
+//         for (const auto& packet : packets)
+//         {
+//             if (packet.received)
+//             {
+//                 totalReceived++;
+//                 totalDelay += (packet.receiveTime - packet.sendTime);
+//                 NS_LOG_INFO("  Packet " << packet.packetId << " was received by Node "
+//                                         << packet.destinationNode);
+//             }
+//             else
+//             {
+//                 NS_LOG_INFO("  Packet " << packet.packetId << " was not received by Node "
+//                                         << packet.destinationNode);
+//             }
+//             totalBytes += packet.size;
+//         }
 
-        double packetLossRate =
-            totalSent > 0 ? static_cast<double>(totalSent - totalReceived) / totalSent * 100.0
-                          : 0.0;
-        double averageDelay = totalReceived > 0 ? totalDelay / totalReceived * 1000 : 0; // in ms
-        double throughput = totalBytes * 8.0 / Simulator::Now().GetSeconds() / 1000000;  // in Mbps
+//         double packetLossRate =
+//             totalSent > 0 ? static_cast<double>(totalSent - totalReceived) / totalSent * 100.0
+//                           : 0.0;
+//         double averageDelay = totalReceived > 0 ? totalDelay / totalReceived * 1000 : 0; // in ms
+//         double throughput = totalBytes * 8.0 / Simulator::Now().GetSeconds() / 1000000;  // in
+//         Mbps
 
-        NS_LOG_INFO("Node " << nodeId << " statistics:");
-        NS_LOG_INFO("  Sent packets: " << totalSent);
-        NS_LOG_INFO("  Received packets: " << totalReceived);
-        NS_LOG_INFO("  Packet loss rate: " << packetLossRate << "%");
-        NS_LOG_INFO("  Average delay: " << averageDelay << " ms");
-        NS_LOG_INFO("  Throughput: " << throughput << " Mbps");
-        NS_LOG_INFO("");
-    }
-}
-
-void
-PacketSendCallback(std::string context, Ptr<const Packet> packet)
-{
-    uint32_t nodeId = std::stoul(context.substr(10));
-    Ptr<Packet> copy = packet->Copy();
-
-    Ipv4Header ipHeader;
-    copy->RemoveHeader(ipHeader);
-    uint32_t destinationNode = (ipHeader.GetDestination().Get() & 0xFF) % 50;
-    PacketInfo info;
-    info.packetId = packet->GetUid();
-    info.sendTime = Simulator::Now().GetSeconds();
-    info.size = packet->GetSize();
-    info.destinationNode = destinationNode;
-    info.received = false;
-
-    nodeSentPackets[nodeId].push_back(info);
-
-    // NS_LOG_INFO("Node " << nodeId << " sent packet " << info.packetId << " to Node "
-    //                     << info.destinationNode << " at " << info.sendTime << "s");
-}
-
-void
-PacketReceiveCallback(std::string context, Ptr<const Packet> packet)
-{
-    uint32_t nodeId = std::stoul(context.substr(10));
-    Ptr<Packet> copy = packet->Copy();
-
-    Ipv4Header ipHeader;
-    copy->RemoveHeader(ipHeader);
-
-    uint32_t senderNodeId = ipHeader.GetSource().Get() & 0xFF;
-
-    // BUG senderNodeId
-    //  NS_LOG_INFO("Node " << nodeId << " received packet " << packet->GetUid() << " from Node "
-    //                      << senderNodeId << " at " << Simulator::Now().GetSeconds() << "s");
-
-    // 在发送节点的已发送包列表中查找并标记为已接收
-    if (nodeSentPackets.find(senderNodeId) != nodeSentPackets.end())
-    {
-        auto& senderPackets = nodeSentPackets[senderNodeId];
-        for (auto& sentPacket : senderPackets)
-        {
-            if (sentPacket.packetId == packet->GetUid())
-            {
-                sentPacket.received = true;
-                sentPacket.receiveTime = Simulator::Now().GetSeconds();
-                NS_LOG_INFO("Marked packet " << sentPacket.packetId << " as received");
-                break;
-            }
-        }
-    }
-    else
-    {
-        // NS_LOG_WARN("No sent packets found for Node " << senderNodeId);
-    }
-}
+//         NS_LOG_INFO("Node " << nodeId << " statistics:");
+//         NS_LOG_INFO("  Sent packets: " << totalSent);
+//         NS_LOG_INFO("  Received packets: " << totalReceived);
+//         NS_LOG_INFO("  Packet loss rate: " << packetLossRate << "%");
+//         NS_LOG_INFO("  Average delay: " << averageDelay << " ms");
+//         NS_LOG_INFO("  Throughput: " << throughput << " Mbps");
+//         NS_LOG_INFO("");
+//     }
+// }
 
 void
 IpTrace(const Ipv4Header& ipHeader, Ptr<const Packet> packet, uint32_t interface)
@@ -177,32 +121,42 @@ printNodePositions(NodeContainer nodes)
                             << pos.z << ")");
     }
 
-    Simulator::Schedule(Seconds(10.0), &printNodePositions, nodes);
+    Simulator::Schedule(Seconds(0.1), &printNodePositions, nodes);
 }
 
 int
 main(int argc, char* argv[])
 {
+    // BACK END
+    //  CommandLine cmd;
+    //  uint32_t nNodes = 10;                         // 默认值：10个节点
+    //  double simulationTime = 10.0;                 // 默认值：10秒
+    //  double txPower = 20.0;                        // 默认值：20 dBm
+    //  double frequency = 5.0;                       // 默认值：5 GHz
+    //  uint32_t channelWidth = 80;                   // 默认值：80 MHz
+    //  std::string propagationModel = "LogDistance"; // 默认传播模型
+
+    // // 注册命令行参数
+    // cmd.AddValue("nNodes", "Number of nodes", nNodes);
+    // cmd.AddValue("simulationTime", "Simulation time in seconds", simulationTime);
+    // cmd.AddValue("txPower", "Transmission power in dBm", txPower);
+    // cmd.AddValue("frequency", "Frequency band in GHz", frequency);
+    // cmd.AddValue("channelWidth", "Channel width in MHz", channelWidth);
+    // cmd.AddValue("propagationModel", "Propagation loss model", propagationModel);
+    // cmd.Parse(argc, argv);
+
     LogComponentEnable("FLSSimulation", LOG_LEVEL_INFO);
     LogComponentEnable("FLSApplication", LOG_LEVEL_INFO);
     LogComponentEnable("TraceBasedMobilityModel", LOG_LEVEL_INFO);
-    // LogComponentEnable("Ipv4L3Protocol", LOG_LEVEL_ALL);
-    // LogComponentEnable ("ArpL3Protocol", LOG_LEVEL_DEBUG);
-    // LogComponentEnable ("ArpCache", LOG_LEVEL_DEBUG);
-    // LogComponentEnable("UdpSocketImpl", LOG_LEVEL_DEBUG);
-
-    // ns3::LogComponentEnable("FLSSimulation", ns3::LOG_PREFIX_TIME);
-    // ns3::LogComponentEnable("FLSApplication", ns3::LOG_PREFIX_TIME);
-    // ns3::LogComponentEnable("TraceBasedMobilityModel", ns3::LOG_PREFIX_TIME);
 
     Config::SetDefault("ns3::WifiRemoteStationManager::FragmentationThreshold",
                        StringValue("2200"));
     Config::SetDefault("ns3::WifiRemoteStationManager::RtsCtsThreshold", StringValue("2200"));
     Config::SetDefault("ns3::WifiMacQueue::MaxSize", QueueSizeValue(QueueSize("100p")));
 
-    std::string traceDir = "scratch/FLS/traces/";
+    std::string traceDir = "scratch/FLS/traces/interTest/";
 
-    uint32_t nNodes = 50;
+    uint32_t nNodes = 10;
     NodeContainer nodes;
     nodes.Create(nNodes);
 
@@ -241,16 +195,35 @@ main(int argc, char* argv[])
 
     YansWifiPhyHelper wifiPhy;
     YansWifiChannelHelper wifiChannel;
+
+    wifiPhy.Set("TxPowerStart", DoubleValue(23.0)); // 较高发射功率 (dBm)
+    wifiPhy.Set("TxPowerEnd", DoubleValue(23.0));
+    wifiPhy.Set("RxSensitivity", DoubleValue(-82)); // 较高的接收灵敏度
+
     wifiChannel.SetPropagationDelay("ns3::ConstantSpeedPropagationDelayModel");
+    // wifiChannel.AddPropagationLoss("ns3::LogDistancePropagationLossModel",
+    //                                "Exponent",
+    //                                DoubleValue(3.0),
+    //                                "ReferenceDistance",
+    //                                DoubleValue(1.0),
+    //                                "ReferenceLoss",
+    //                                DoubleValue(46.667));
     wifiChannel.AddPropagationLoss("ns3::RangePropagationLossModel",
                                    "MaxRange",
-                                   DoubleValue(100.0));
+                                   DoubleValue(1000.0));
     wifiPhy.SetChannel(wifiChannel.Create());
+    // wifiPhy.SetErrorRateModel("ns3::YansErrorRateModel");
+
+    // PHY Setting
+    // wifiPhy.Set("RxNoiseFigure", DoubleValue(7.0));
 
     NetDeviceContainer devices = wifi.Install(wifiPhy, wifiMac, nodes);
 
     // Install protocol stack
     InternetStackHelper internet;
+    // AodvHelper aodv;
+    // internet.SetRoutingHelper(aodv);
+
     internet.Install(nodes);
 
     Ipv4AddressHelper address;
@@ -259,45 +232,11 @@ main(int argc, char* argv[])
 
     Ipv4GlobalRoutingHelper::PopulateRoutingTables();
 
-    // ADD: Print routing tables and ARP caches
-    Ptr<OutputStreamWrapper> routingStream = Create<OutputStreamWrapper>(&std::cout);
-    for (uint32_t i = 0; i < nodes.GetN(); ++i)
-    {
-        Ptr<Ipv4> ipv4 = nodes.Get(i)->GetObject<Ipv4>();
-        Ptr<Ipv4RoutingProtocol> routingProtocol = ipv4->GetRoutingProtocol();
-        Ptr<Ipv4ListRouting> listRouting = DynamicCast<Ipv4ListRouting>(routingProtocol);
-
-        if (listRouting)
-        {
-            for (uint32_t j = 0; j < listRouting->GetNRoutingProtocols(); j++)
-            {
-                int16_t priority;
-                Ptr<Ipv4RoutingProtocol> protocol = listRouting->GetRoutingProtocol(j, priority);
-                Ptr<Ipv4StaticRouting> staticRouting = DynamicCast<Ipv4StaticRouting>(protocol);
-                if (staticRouting)
-                {
-                    NS_LOG_INFO("Routing table for node " << i << ":");
-                    staticRouting->PrintRoutingTable(routingStream);
-                    break;
-                }
-            }
-        }
-
-        // MODIFY: Use GetObject<Ipv4L3Protocol>() to get the L3 protocol
-        Ptr<Ipv4L3Protocol> ipv4L3 = ipv4->GetObject<Ipv4L3Protocol>();
-        if (ipv4L3)
-        {
-            for (uint32_t j = 0; j < ipv4L3->GetNInterfaces(); j++)
-            {
-                Ptr<ArpCache> arpCache = ipv4L3->GetInterface(j)->GetArpCache();
-                if (arpCache)
-                {
-                    NS_LOG_INFO("ARP cache for node " << i << ", interface " << j << ":");
-                    arpCache->PrintArpCache(routingStream);
-                }
-            }
-        }
-    }
+    Ptr<OutputStreamWrapper> routingStream =
+        Create<OutputStreamWrapper>("routes.txt", std::ios::out);
+    Ipv4GlobalRoutingHelper::PrintRoutingTableAllAt(Seconds(0.0), routingStream); // 初始状态
+    Ipv4GlobalRoutingHelper::PrintRoutingTableAllAt(Seconds(1.5), routingStream); // 应用启动后
+    Ipv4GlobalRoutingHelper::PrintRoutingTableAllAt(Seconds(30.0), routingStream); // 运行一段时间后
 
     NS_LOG_INFO("Wi-Fi and Internet stack installed.");
 
@@ -312,14 +251,14 @@ main(int argc, char* argv[])
         }
     }
 
-    int port = 9;
+    // int port = 9;
     ApplicationContainer flsApps;
     for (uint32_t i = 0; i < nNodes; ++i)
     {
         Ptr<FLSApplication> app = CreateObject<FLSApplication>();
         nodes.Get(i)->AddApplication(app);
         app->SetStartTime(Seconds(1.0));
-        app->SetStopTime(Seconds(90.0));
+        app->SetStopTime(Seconds(15.0));
         // loading packet trace file
         std::string traceFilename = traceDir + "packet_trace_node_" + std::to_string(i) + ".txt";
         app->SetupTraceFile(traceFilename);
@@ -330,14 +269,16 @@ main(int argc, char* argv[])
 
     FlowMonitorHelper flowmon;
     Ptr<FlowMonitor> monitor = flowmon.InstallAll();
-    NS_LOG_INFO("Simulation started");
-    Simulator::Stop(Seconds(90.0));
+    Ptr<Ipv4FlowClassifier> classifier = DynamicCast<Ipv4FlowClassifier>(flowmon.GetClassifier());
+    StatisticsManager statistics;
+    statistics.Setup(monitor, classifier);
 
-    Config::Connect("/NodeList/*/DeviceList/*/$ns3::WifiNetDevice/Mac/MacTx",
-                    MakeCallback(&PacketSendCallback));
-    Config::Connect("/NodeList/*/DeviceList/*/$ns3::WifiNetDevice/Mac/MacRx",
-                    MakeCallback(&PacketReceiveCallback));
+    NS_LOG_INFO("Simulation started");
+    Simulator::Stop(Seconds(15.0));
+
     AnimationInterface anim("fls-animation.xml");
+    anim.EnablePacketMetadata(true);
+
     for (uint32_t i = 0; i < nodes.GetN(); ++i)
     {
         anim.UpdateNodeColor(nodes.Get(i), 255, 0, 0);
@@ -354,11 +295,13 @@ main(int argc, char* argv[])
     }
     Simulator::Run();
 
-    NS_LOG_INFO("Simulation statistics:");
-    // PrintStatistics();
+    Json::Value results;
+    Json::Value flowStats(Json::arrayValue);
 
     monitor->CheckForLostPackets();
-    Ptr<Ipv4FlowClassifier> classifier = DynamicCast<Ipv4FlowClassifier>(flowmon.GetClassifier());
+    statistics.CollectStatistics();
+    statistics.PrintStats();
+
     std::map<FlowId, FlowMonitor::FlowStats> stats = monitor->GetFlowStats();
 
     // 打印统计信息
@@ -367,6 +310,26 @@ main(int argc, char* argv[])
          ++i)
     {
         Ipv4FlowClassifier::FiveTuple t = classifier->FindFlow(i->first);
+
+        // Json::Value flow;
+        // flow["flowId"] = i->first;
+        // flow["sourceAddress"] = t.sourceAddress.Get();
+        // flow["destinationAddress"] = t.destinationAddress.Get();
+        // flow["txPackets"] = i->second.txPackets;     // 发送的数据包数
+        // flow["rxPackets"] = i->second.rxPackets;     // 接收的数据包数
+        // flow["lostPackets"] = i->second.lostPackets; // 丢失的数据包数
+
+        // // 计算吞吐量（Mbps）
+        // flow["throughput"] =
+        //     i->second.rxBytes * 8.0 /
+        //     (i->second.timeLastRxPacket.GetSeconds() - i->second.timeFirstTxPacket.GetSeconds())
+        //     / 1000000;
+
+        // // 计算平均延迟（毫秒）
+        // flow["delay"] = i->second.delaySum.GetSeconds() / i->second.rxPackets * 1000;
+
+        // // 将流信息添加到数组
+        // flowStats.append(flow);
 
         std::cout << "Flow " << i->first << " (" << t.sourceAddress << " -> "
                   << t.destinationAddress << ")\n";
@@ -384,79 +347,18 @@ main(int argc, char* argv[])
         std::cout << "  Mean Delay: "
                   << i->second.delaySum.GetSeconds() / i->second.rxPackets * 1000 << " ms\n";
         std::cout << "  Mean Jitter: "
-                  << i->second.jitterSum.GetSeconds() / (i->second.rxPackets - 1) * 1000 << " ms\n";
+                  << i->second.jitterSum.GetSeconds() / (i->second.rxPackets - 1) * 1000 << "ms\n";
         std::cout << "\n";
     }
+
+    results["flowStats"] = flowStats;
+
+    std::ofstream resultFile("simulation-results.json");
+    resultFile << results;
+    resultFile.close();
 
     Simulator::Destroy();
     NS_LOG_INFO("Simulation completed successfully");
 
     return 0;
 }
-
-/*
-Wifi Standard
-802.11a
-ns-3 设置：wifi.SetStandard(WIFI_STANDARD_80211a);
-802.11b
-ns-3 设置：wifi.SetStandard(WIFI_STANDARD_80211b);
-802.11g
-ns-3 设置：wifi.SetStandard(WIFI_STANDARD_80211g);
-802.11n
-wifi.SetStandard(WIFI_STANDARD_80211n);
-802.11ac
-wifi.SetStandard(WIFI_STANDARD_80211ac);
-
-PropagationLossModel
-
-wifiChannel.AddPropagationLoss("ns3::FriisPropagationLossModel");
-wifiChannel.AddPropagationLoss("ns3::LogDistancePropagationLossModel",
-                               "Exponent", DoubleValue(3.0));
-wifiChannel.AddPropagationLoss("ns3::ThreeLogDistancePropagationLossModel");
-wifiChannel.AddPropagationLoss("ns3::NakagamiPropagationLossModel");
-wifiChannel.AddPropagationLoss("ns3::HybridBuildingsPropagationLossModel");
-wifiChannel.AddPropagationLoss("ns3::FixedRssLossModel",
-                               "Rss", DoubleValue(-80.0));
-wifiChannel.AddPropagationLoss("ns3::TwoRayGroundPropagationLossModel");
-
-TxPower
-wifiPhy.Set("TxPowerStart", DoubleValue(x));  // 最小发射功率
-wifiPhy.Set("TxPowerEnd", DoubleValue(x));    // 最大发射功率
-
-ChannelSetting Channel Number - bandwith - Frequency band
-wifiPhy.Set("ChannelSettings", StringValue("{36, 80, BAND_5GHZ, 0}"));
-
-
-Mac Type
-wifiMac.SetType("ns3::AdhocWifiMac");
-wifiMac.SetType("ns3::StaWifiMac", "Ssid", SsidValue(ssid));
-wifiMac.SetType("ns3::ApWifiMac", "Ssid", SsidValue(ssid));
-mesh.SetMacType("ns3::MeshWifiInterfaceMac");
-
-
-Ptr<BuildingsPropagationLossModel> propagationLossModel =
-CreateObject<BuildingsPropagationLossModel>();
-propagationLossModel->SetAttribute("ShadowSigmaOutdoor", DoubleValue(7.0));
-propagationLossModel->SetAttribute("ShadowSigmaIndoor", DoubleValue(8.0));
-channel.AddPropagationLoss(propagationLossModel);
-
-
-wifi.SetStandard(WIFI_STANDARD_80211ax)
-
-
-Ptr<SpectrumInterferenceHelper> interferenceHelper = CreateObject<SpectrumInterferenceHelper>();
-Ptr<SpectrumValue> interferencePsd = Create<SpectrumValue>(specificSpectrumModel);
-interferenceHelper->AddInterference(interferencePsd, Seconds(1.0));
-
-
-Ptr<FixedRssLossModel> rssLoss = CreateObject<FixedRssLossModel>();
-rssLoss->SetRss(-90);
-channel.AddPropagationLoss(rssLoss);
-
-Ptr<GridBuildingAllocator> gridBuildingAllocator = CreateObject<GridBuildingAllocator>();
-gridBuildingAllocator->SetAttribute("GridWidth", UintegerValue(X));
-gridBuildingAllocator->SetAttribute("BufildingHeight", DoubleValue(X));
-gridBuildingAllocator->Create(X);
-
-
-*/

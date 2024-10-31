@@ -71,7 +71,8 @@ TraceBasedMobilityModel::LoadTrace(std::string filename)
 
     Interpolate();
 
-    m_position = m_interpolatedTrace.begin()->second;
+    // m_position = m_interpolatedTrace.begin()->second;
+    m_position = m_trace.begin()->second;
     m_event = Simulator::Schedule(Seconds(0.0), &TraceBasedMobilityModel::UpdatePosition, this);
 }
 

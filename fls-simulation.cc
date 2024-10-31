@@ -154,9 +154,9 @@ main(int argc, char* argv[])
     Config::SetDefault("ns3::WifiRemoteStationManager::RtsCtsThreshold", StringValue("2200"));
     Config::SetDefault("ns3::WifiMacQueue::MaxSize", QueueSizeValue(QueueSize("100p")));
 
-    std::string traceDir = "scratch/FLS/traces/interTest/";
+    std::string traceDir = "scratch/FLS/traces/";
 
-    uint32_t nNodes = 10;
+    uint32_t nNodes = 454;
     NodeContainer nodes;
     nodes.Create(nNodes);
 
@@ -176,7 +176,8 @@ main(int argc, char* argv[])
     for (uint32_t i = 0; i < nNodes; ++i)
     {
         Ptr<TraceBasedMobilityModel> model = nodes.Get(i)->GetObject<TraceBasedMobilityModel>();
-        std::string filename = traceDir + "trace_node_" + std::to_string(i) + ".txt";
+        // std::string filename = traceDir + "trace_node_" + std::to_string(i) + ".txt";
+        std::string filename = traceDir + "trace_node_" + std::to_string(i);
         NS_LOG_INFO("Loading trace for node " << i << " from file: " << filename);
         model->LoadTrace(filename);
     }
@@ -227,7 +228,7 @@ main(int argc, char* argv[])
     internet.Install(nodes);
 
     Ipv4AddressHelper address;
-    address.SetBase("10.1.1.0", "255.255.255.0");
+    address.SetBase("10.1.0.0", "255.255.254.0");
     Ipv4InterfaceContainer interfaces = address.Assign(devices);
 
     Ipv4GlobalRoutingHelper::PopulateRoutingTables();
@@ -258,9 +259,10 @@ main(int argc, char* argv[])
         Ptr<FLSApplication> app = CreateObject<FLSApplication>();
         nodes.Get(i)->AddApplication(app);
         app->SetStartTime(Seconds(1.0));
-        app->SetStopTime(Seconds(15.0));
+        app->SetStopTime(Seconds(65.0));
         // loading packet trace file
-        std::string traceFilename = traceDir + "packet_trace_node_" + std::to_string(i) + ".txt";
+        // std::string traceFilename = traceDir + "packet_trace_node_" + std::to_string(i) + ".txt";
+        std::string traceFilename = traceDir + "packet_trace_node_" + std::to_string(i);
         app->SetupTraceFile(traceFilename);
         flsApps.Add(app);
     }
@@ -270,11 +272,16 @@ main(int argc, char* argv[])
     FlowMonitorHelper flowmon;
     Ptr<FlowMonitor> monitor = flowmon.InstallAll();
     Ptr<Ipv4FlowClassifier> classifier = DynamicCast<Ipv4FlowClassifier>(flowmon.GetClassifier());
+    monitor->SetAttribute("MaxPerHopDelay", TimeValue(Seconds(2.0)));
+    monitor->SetAttribute("StartTime", TimeValue(Seconds(0)));
+    monitor->SetAttribute("DelayBinWidth", TimeValue(MilliSeconds(100)));
+    monitor->SetAttribute("JitterBinWidth", TimeValue(MilliSeconds(10)));
+    monitor->SetAttribute("PacketSizeBinWidth", UintegerValue(20));
     StatisticsManager statistics;
     statistics.Setup(monitor, classifier);
 
     NS_LOG_INFO("Simulation started");
-    Simulator::Stop(Seconds(15.0));
+    Simulator::Stop(Seconds(65.0));
 
     AnimationInterface anim("fls-animation.xml");
     anim.EnablePacketMetadata(true);

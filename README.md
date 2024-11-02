@@ -31,17 +31,19 @@ After that, we need to install a optional ns-3 module called NetAnim to show the
 ### Installing
 
 First we will create a NS-FLS directory under ns-3-dev home directory. Go to ns-3-dev home directory and run
-'''
+
+```
 $ mkdir NS-FLS
 $ cd NS-FLS
 $ git clone https://github.com/GeNeLa/NS-FLS.git
-'''
+```
 
 Then, we build our NS-FLS platform in ns-3-dev home directory
-'''
+
+```
 $ ./ns3 configure --enable-examples --enable-tests
 $ ./ns3 build
-'''
+```
 
 ### Executing program
 
@@ -66,4 +68,4 @@ If you have any technical issue, please submit Issues. For any other question, p
 
 ## License
 
-This project is licensed under the [GPL-3.0] License - see the LICENSE.md file for details
+This project is licensed under the [GPL-3.0](https://www.gnu.org/licenses/gpl-3.0.en.html) License - see the LICENSE.md file for details

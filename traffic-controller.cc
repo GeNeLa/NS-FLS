@@ -1,4 +1,4 @@
-#include "fls-application.h"
+#include "traffic-controller.h"
 
 #include "ns3/log.h"
 #include "ns3/mobility-model.h"
@@ -87,6 +87,16 @@ FLSApplication::SendPacket(void)
         const PacketTrace& trace = m_packetTraces[m_currentTraceIndex];
         Ptr<Packet> packet = Create<Packet>(trace.size);
 
+        Time now = Simulator::Now();
+        m_stats.sentPackets++;
+        m_stats.sentBytes += trace.size;
+
+        if (m_stats.firstSentTime == Seconds(0))
+        {
+            m_stats.firstSentTime = now;
+        }
+        m_stats.lastSentTime = now;
+
         Ipv4Address destAddr(trace.destination.c_str());
         bool isBroadCast = (trace.destination == "255.255.255.255");
 
@@ -107,10 +117,10 @@ FLSApplication::SendPacket(void)
             }
             else
             {
-                NS_LOG_INFO("APP LAYER: " << Simulator::Now().GetSeconds() << "s\t"
-                                          << "Node " << GetNode()->GetId() << "\tBroadcast\t"
-                                          << trace.size << " bytes"
-                                          << "\tPacketID: " << packet->GetUid());
+                // NS_LOG_INFO("APP LAYER: " << Simulator::Now().GetSeconds() << "s\t"
+                //                           << "Node " << GetNode()->GetId() << "\tBroadcast\t"
+                //                           << trace.size << " bytes"
+                //                           << "\tPacketID: " << packet->GetUid());
                 m_packetsSent++;
             }
         }
@@ -124,15 +134,15 @@ FLSApplication::SendPacket(void)
             }
             else
             {
-                NS_LOG_INFO("APP LAYER: " << Simulator::Now().GetSeconds() << "s\t"
-                                          << "Node " << GetNode()->GetId() << "\tUniCast\t"
-                                          << trace.size << " bytes"
-                                          << "\tPacketID: " << packet->GetUid());
+                // NS_LOG_INFO("APP LAYER: " << Simulator::Now().GetSeconds() << "s\t"
+                //                           << "Node " << GetNode()->GetId() << "\tUniCast\t"
+                //                           << trace.size << " bytes"
+                //                           << "\tPacketID: " << packet->GetUid());
                 m_packetsSent++;
             }
         }
 
-        NS_LOG_INFO("Socket state after send: " << m_socket->GetErrno());
+        // NS_LOG_INFO("Socket state after send: " << m_socket->GetErrno());
 
         switch (m_socket->GetErrno())
         {
@@ -194,11 +204,20 @@ FLSApplication::ReceivePacket(Ptr<Socket> socket)
     Address from;
     while ((packet = socket->RecvFrom(from)))
     {
+        Time now = Simulator::Now();
+        m_stats.receivedPackets++;
+        m_stats.receivedBytes += packet->GetSize();
         m_packetsReceived++;
 
-        NS_LOG_INFO("Node " << GetNode()->GetId() << " received packet from "
-                            << InetSocketAddress::ConvertFrom(from).GetIpv4() << " at time "
-                            << Simulator::Now().GetSeconds() << "s");
+        if (m_stats.firstReceivedTime == Seconds(0))
+        {
+            m_stats.firstReceivedTime = now;
+        }
+        m_stats.lastReceivedTime = now;
+
+        // NS_LOG_INFO("Node " << GetNode()->GetId() << " received packet from "
+        //                     << InetSocketAddress::ConvertFrom(from).GetIpv4() << " at time "
+        //                     << Simulator::Now().GetSeconds() << "s");
     }
 }
 

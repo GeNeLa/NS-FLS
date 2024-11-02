@@ -1,4 +1,4 @@
-#include "trace-based-mobility-model.h"
+#include "mobility-controller.h"
 
 #include "ns3/double.h"
 #include "ns3/log.h"

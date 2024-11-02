@@ -80,7 +80,9 @@ const SimulationDashboard = () => {
     <div className="max-w-6xl mx-auto">
       <Tabs defaultValue="config" className="w-full">
         <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="config">Configuration</TabsTrigger>
+          <TabsTrigger className="" value="config">
+            Configuration
+          </TabsTrigger>
           <TabsTrigger value="control">Simulation Control</TabsTrigger>
           <TabsTrigger value="results">Results</TabsTrigger>
         </TabsList>
@@ -93,7 +95,7 @@ const SimulationDashboard = () => {
             <CardContent className="space-y-6">
               {/* PHY Type Selection */}
               <div className="space-y-2">
-                <Label>PHY Type</Label>
+                <Label className="text-2xl">PHY Type</Label>
                 <RadioGroup
                   value={phyType}
                   onValueChange={setPhyType}
@@ -108,7 +110,9 @@ const SimulationDashboard = () => {
                       />
                       <Label
                         htmlFor={type.id}
-                        className={type.disabled ? "text-gray-400" : ""}
+                        className={
+                          type.disabled ? "text-xl text-gray-400" : "text-xl"
+                        }
                       >
                         {type.name}
                       </Label>
@@ -120,7 +124,7 @@ const SimulationDashboard = () => {
               {phyType === "wifi" && (
                 <>
                   <div className="space-y-2">
-                    <Label>Transmission Power (dBm)</Label>
+                    <Label className="text-xl">Transmission Power (dBm)</Label>
                     <div className="flex items-center gap-4">
                       <Slider
                         value={[txPower]}
@@ -135,7 +139,7 @@ const SimulationDashboard = () => {
                   </div>
 
                   <div className="space-y-2">
-                    <Label>Frequency Band (GHz)</Label>
+                    <Label className="text-xl">Frequency Band (GHz)</Label>
                     <div className="flex items-center gap-4">
                       <Slider
                         value={[frequency]}
@@ -150,7 +154,7 @@ const SimulationDashboard = () => {
                   </div>
 
                   <div className="space-y-2">
-                    <Label>Channel Width (MHz)</Label>
+                    <Label className="text-xl">Channel Width (MHz)</Label>
                     <div className="flex items-center gap-4">
                       <Slider
                         value={[channelWidth]}
@@ -165,7 +169,7 @@ const SimulationDashboard = () => {
                   </div>
 
                   <div className="space-y-2">
-                    <Label>Propagation Loss Model</Label>
+                    <Label className="text-xl">Propagation Loss Model</Label>
                     <select
                       className="w-full p-2 border rounded-md"
                       value={propagationModel}

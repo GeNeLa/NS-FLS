@@ -6,7 +6,7 @@ function App() {
     <div className="min-h-screen bg-background p-4">
       <header className="mb-8">
         <h1 className="text-3xl font-bold text-center">
-          NS-3 Simulation Dashboard
+          NS-FLS Simulation Dashboard
         </h1>
       </header>
       <main>

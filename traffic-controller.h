@@ -25,7 +25,41 @@ class FLSApplication : public Application
     uint32_t GetPacketsReceived(void) const;
     void SetupTraceFile(const std::string& filename);
 
+    struct TrafficStats
+    {
+        // 发送统计
+        uint32_t sentPackets{0};
+        uint64_t sentBytes{0};
+        Time firstSentTime{Seconds(0)};
+        Time lastSentTime{Seconds(0)};
+
+        // 接收统计
+        uint32_t receivedPackets{0};
+        uint64_t receivedBytes{0};
+        Time firstReceivedTime{Seconds(0)};
+        Time lastReceivedTime{Seconds(0)};
+
+        // 清除统计
+        void Clear()
+        {
+            sentPackets = 0;
+            sentBytes = 0;
+            receivedPackets = 0;
+            receivedBytes = 0;
+            firstSentTime = Seconds(0);
+            lastSentTime = Seconds(0);
+            firstReceivedTime = Seconds(0);
+            lastReceivedTime = Seconds(0);
+        }
+    };
+
+    const TrafficStats& GetStats() const
+    {
+        return m_stats;
+    }
+
   private:
+    TrafficStats m_stats;
     virtual void StartApplication(void);
     virtual void StopApplication(void);
 

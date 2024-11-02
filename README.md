@@ -20,10 +20,11 @@ $ cd ns-allinone-3.42/ns-3.42
 ```
 
 2. Clone ns-3 from the Git repository. The ns-3-allinone can be cloned, as well as ns-3-dev by itself. Below, we illustrate the latter:
-   '''
-   $ git clone https://gitlab.com/nsnam/ns-3-dev.git
-   $ cd ns-3-dev
-   '''
+
+```
+$ git clone https://gitlab.com/nsnam/ns-3-dev.git
+$ cd ns-3-dev
+```
 
 After that, we need to install a optional ns-3 module called NetAnim to show the FLS's moving pattern, we can refer this [page](https://www.nsnam.org/wiki/NetAnim_3.107) for instructions
 

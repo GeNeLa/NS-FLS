@@ -1,4 +1,5 @@
 #include "mobility-controller.h"
+#include "options.h"
 #include "packet-trace.h"
 #include "statistics-manager.h"
 #include "traffic-controller.h"
@@ -142,26 +143,12 @@ printNodePositions(NodeContainer nodes)
 int
 main(int argc, char* argv[])
 {
-    // BACK END
-    //  CommandLine cmd;
-    //  uint32_t nNodes = 10;                         // 默认值：10个节点
-    //  double simulationTime = 10.0;                 // 默认值：10秒
-    //  double txPower = 20.0;                        // 默认值：20 dBm
-    //  double frequency = 5.0;                       // 默认值：5 GHz
-    //  uint32_t channelWidth = 80;                   // 默认值：80 MHz
-    //  std::string propagationModel = "LogDistance"; // 默认传播模型
-
-    // // 注册命令行参数
-    // cmd.AddValue("nNodes", "Number of nodes", nNodes);
-    // cmd.AddValue("simulationTime", "Simulation time in seconds", simulationTime);
-    // cmd.AddValue("txPower", "Transmission power in dBm", txPower);
-    // cmd.AddValue("frequency", "Frequency band in GHz", frequency);
-    // cmd.AddValue("channelWidth", "Channel width in MHz", channelWidth);
-    // cmd.AddValue("propagationModel", "Propagation loss model", propagationModel);
-    // cmd.Parse(argc, argv);
+    SimulationOptions options;
+    options.Parse(argc, argv);
 
     LogComponentEnable("FLSSimulation", LOG_LEVEL_INFO);
     LogComponentEnable("FLSApplication", LOG_LEVEL_INFO);
+    LogComponentEnable("SimulationOptions", LOG_LEVEL_INFO);
     LogComponentEnable("TraceBasedMobilityModel", LOG_LEVEL_INFO);
 
     Config::SetDefault("ns3::WifiRemoteStationManager::FragmentationThreshold",
@@ -170,8 +157,7 @@ main(int argc, char* argv[])
     Config::SetDefault("ns3::WifiMacQueue::MaxSize", QueueSizeValue(QueueSize("100p")));
 
     std::string traceDir = "scratch/FLS/traces/";
-
-    uint32_t nNodes = 454;
+    uint32_t nNodes = options.GetNumberOfNodes();
     NodeContainer nodes;
     nodes.Create(nNodes);
 
@@ -201,10 +187,57 @@ main(int argc, char* argv[])
     Simulator::Schedule(Seconds(0.0), &printNodePositions, nodes);
     // printNodePositions(nodes);
 
+    int standard = 0;
+    std::string wifiStandard = options.GetWifiStandard();
+    if (wifiStandard == "80211b")
+        standard = 1;
+    else if (wifiStandard == "80211a")
+        standard = 2;
+    else if (wifiStandard == "80211g")
+        standard = 3;
+    else if (wifiStandard == "80211n")
+        standard = 4;
+    else if (wifiStandard == "80211ac")
+        standard = 5;
+    else if (wifiStandard == "80211ax")
+        standard = 6;
+
     WifiHelper wifi;
-    // Using WIFI 6
-    // wifi.SetStandard(WIFI_STANDARD_80211ax);
-    wifi.SetStandard(WIFI_STANDARD_80211b);
+    switch (standard)
+    {
+    case 1:
+        NS_LOG_INFO("set wifi standard 80211b");
+        wifi.SetStandard(WIFI_STANDARD_80211b);
+        break;
+    case 2:
+        NS_LOG_INFO("set wifi standard 80211a");
+        wifi.SetStandard(WIFI_STANDARD_80211a);
+        break;
+
+    case 3:
+        NS_LOG_INFO("set wifi standard 80211g");
+        wifi.SetStandard(WIFI_STANDARD_80211g);
+        break;
+
+    case 4:
+        NS_LOG_INFO("set wifi standard 80211n");
+        wifi.SetStandard(WIFI_STANDARD_80211n);
+        break;
+
+    case 5:
+        NS_LOG_INFO("set wifi standard 80211ac");
+        wifi.SetStandard(WIFI_STANDARD_80211ac);
+        break;
+
+    case 6:
+        NS_LOG_INFO("set wifi standard 80211ax");
+        wifi.SetStandard(WIFI_STANDARD_80211ax);
+        break;
+
+    default:
+        NS_LOG_ERROR("unknown wifi standard: " << wifiStandard);
+        return 1;
+    }
 
     // Using Adhoc network
     WifiMacHelper wifiMac;
@@ -213,17 +246,11 @@ main(int argc, char* argv[])
     YansWifiPhyHelper wifiPhy;
     YansWifiChannelHelper wifiChannel;
 
-    // wifiPhy.Set("TxPowerStart", DoubleValue(23.0)); // 较高发射功率 (dBm)
-    wifiPhy.Set("TxPowerStart", DoubleValue(23.0)); // 较高发射功率 (dBm)
-    wifiPhy.Set("TxPowerEnd", DoubleValue(23.0));
-    wifiPhy.Set("RxSensitivity", DoubleValue(-82)); // 较高的接收灵敏度
+    wifiPhy.Set("TxPowerStart", DoubleValue(options.GetTxPower()));
+    wifiPhy.Set("TxPowerEnd", DoubleValue(options.GetTxPower()));
+    wifiPhy.Set("RxSensitivity", DoubleValue(options.GetRxSensitivity()));
+    wifiPhy.Set("RxNoiseFigure", DoubleValue(options.GetNoiseFigure()));
 
-    // wifiPhy.Set("TxPowerStart", DoubleValue(10.0)); // 降低发射功率
-    // wifiPhy.Set("TxPowerEnd", DoubleValue(10.0));
-    // wifiPhy.Set("RxSensitivity", DoubleValue(-70));
-    // wifiPhy.Set("RxNoiseFigure", DoubleValue(10.0));
-
-    // 替换原有的传播模型配置
     wifiChannel.SetPropagationDelay("ns3::ConstantSpeedPropagationDelayModel");
     // wifiChannel.AddPropagationLoss("ns3::LogDistancePropagationLossModel",
     //                                "Exponent",

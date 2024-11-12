@@ -47,24 +47,28 @@ $ ./ns3 build
 
 ### Executing program
 
-You should put your trace file in traces directory, for node X, the name should be packet_trace_node_X for traffic trace file, and trace_node_X for position trace file.
+You should put your trace file in traces directory, for node X, the name should be <<packet_trace_node_X>> for traffic trace file, and <<trace_node_X>> for position trace file.
 
 In home directory, use the following command to run NS-FLS simulation
 
 ```
-./ns3 run fls-simulation
+$ ./ns3 run fls-simulation
 ```
+
+You can also run with self-defined network configuration in command line
+currently support: nNodes, simulationTime, txPower, rxSensitivity, rxNoiseFigure, and wifiStandard
+
+```
+$ ./ns3 run "fls-simulation --wifi=80211ax --txPower=20 --nNodes=100"
+```
+
+If you don't specify configuration in command line, it will use default options. You can change default options in <<options.cc>> file
 
 You will see network statistics after simulation done.
 
 ## Join the Community
 
 If you have any technical issue, please submit Issues. For any other question, please contact ychen1329@ucr.edu.
-
-## Version History
-
-- 0.1
-  - Initial Release
 
 ## License
 
